@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- On Windows package installs, `omp update` now stages the native addon before updating so normal launches can load directly from `node_modules` ([#4385](https://github.com/can1357/oh-my-pi/issues/4385)).
+
 ### Fixed
 
 - MCP HTTP reconnects now release obsolete tool generations instead of growing session memory on every reconnect ([#11784](https://github.com/can1357/oh-my-pi/issues/11784)).
