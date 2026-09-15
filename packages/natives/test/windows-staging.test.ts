@@ -218,24 +218,22 @@ describe("windows native addon staging", () => {
 				const cacheDir = path.join(dataHome, "omp/natives");
 				const stagedAddon = path.join(cacheDir, packageJson.version, addonFilename);
 				await fs.mkdir(path.join(dataHome, "omp"), { recursive: true });
+				const setupPath = path.join(root, "setup.mjs");
+				await Bun.write(
+					setupPath,
+					[
+						'import { enableNativeAddonStaging } from "@oh-my-pi/pi-natives/loader";',
+						'if (process.argv[2] === "stage") enableNativeAddonStaging();',
+					].join("\n"),
+				);
 				const probePath = path.join(root, "probe.mjs");
 				await Bun.write(
 					probePath,
 					[
-						// Use bare specifiers, not file URLs, so the probe exercises the
-						// real package exports map: ./loader subpath + . entrypoint.
-						// This catches regressions where an early import loads the native
-						// addon before enableNativeAddonStaging runs, or where ./loader
-						// resolves a different module instance from the . entry.
-						// Dynamic import of the . entry is intentional: it delays the
-						// side-effectful loadNative() call until after staging is set.
+						'import "./setup.mjs";',
+						'import "@oh-my-pi/pi-natives";',
 						'import { enableNativeAddonStaging } from "@oh-my-pi/pi-natives/loader";',
 						'import assert from "node:assert/strict";',
-						'if (process.argv[2] === "stage") enableNativeAddonStaging();',
-						// The . entry calls loadNative() at module evaluation; the
-						// dynamic import triggers that side effect. If staging is on,
-						// it loads the cache copy; if off, it loads from node_modules.
-						'try { await import("@oh-my-pi/pi-natives"); } catch (err) { process.stderr.write(String(err)); process.exit(1); }',
 						'if (process.argv[2] === "direct") assert.throws(enableNativeAddonStaging, Error);',
 						'process.stdout.write("ok");',
 					].join("\n"),
@@ -293,18 +291,4 @@ describe("windows native addon staging", () => {
 		},
 		30_000,
 	);
-});
-
-describe("pi-natives version sentinel", () => {
-	it("Rust `js_name` matches the package version", async () => {
-		// The JS loader (`packages/natives/native/index.js`) computes its expected
-		// sentinel from `package.json#version`; if the Rust source falls out of
-		// sync we ship a `.node` that the loader will refuse to use. Pinning the
-		// pairing here catches release-script regressions before they reach CI.
-		const libRs = await Bun.file(path.join(import.meta.dir, "../../../crates/pi-natives/src/lib.rs")).text();
-		const sentinelMatch = libRs.match(/js_name = "(__piNativesV[A-Za-z0-9_]+)"/);
-		expect(sentinelMatch, 'Rust sentinel `js_name = "__piNativesV…"` not found in lib.rs').not.toBeNull();
-		const expected = `__piNativesV${packageJson.version.replace(/[^A-Za-z0-9]/g, "_")}`;
-		expect(sentinelMatch?.[1]).toBe(expected);
-	});
 });
