@@ -159,6 +159,7 @@ export const commands: CommandEntry[] = [
 	{
 		name: "plugin",
 		load: () => import("./commands/plugin").then(m => m.default),
+		aliases: ["plugins"],
 		help: commandHelp.pluginHelp,
 	},
 	{
